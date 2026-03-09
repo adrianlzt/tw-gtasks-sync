@@ -39,3 +39,4 @@ htmlcov/
 *.pickle
 *.log
 uv.lock
+client_secret.json
