@@ -223,6 +223,13 @@ class TaskWarriorSide:
 
         output = self._run_task(*args)
 
+        new_uuid = self._extract_uuid_from_output(output)
+        if new_uuid:
+            new_item = self.get_item(new_uuid)
+            if new_item:
+                return new_item
+            raise RuntimeError("Failed to get newly created task by UUID")
+
         new_id = self._extract_task_id_from_output(output)
         if new_id:
             items_data = self._run_task_json(str(new_id))
