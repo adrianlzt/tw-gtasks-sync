@@ -164,6 +164,8 @@ class TaskWarriorSide:
         for item_dict in items_data:
             if self._exclude_uda and item_dict.get(self._exclude_uda):
                 continue
+            if item_dict.get("status") == "deleted":
+                continue
             item = TWItem(item_dict)
             items.append(item)
             self._items_cache[item.uuid] = item
