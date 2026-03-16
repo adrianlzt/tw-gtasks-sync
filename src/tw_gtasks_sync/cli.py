@@ -59,8 +59,25 @@ def main(ctx: click.Context, verbose: int) -> None:
     is_flag=True,
     help="Force update all tasks (ignore cache)",
 )
+@click.option(
+    "--dry",
+    is_flag=True,
+    help="Show planned changes without modifying Taskwarrior or Google Tasks",
+)
+@click.option(
+    "--conflict-strategy",
+    type=click.Choice(["notify", "prompt"], case_sensitive=False),
+    help="Override conflict handling strategy for this run",
+)
 @click.pass_context
-def sync(ctx: click.Context, account_name: str | None, oauth_port: int, force: bool) -> None:
+def sync(
+    ctx: click.Context,
+    account_name: str | None,
+    oauth_port: int,
+    force: bool,
+    dry: bool,
+    conflict_strategy: str | None,
+) -> None:
     """Synchronize tasks between Google Tasks and Taskwarrior.
 
     If no account is specified, syncs all configured accounts.
@@ -71,6 +88,8 @@ def sync(ctx: click.Context, account_name: str | None, oauth_port: int, force: b
         console.print("[yellow]No accounts configured.[/yellow]")
         console.print("Run 'tw-gtasks-sync auth' to add an account first.")
         sys.exit(1)
+
+    selected_conflict_strategy = conflict_strategy or config.conflict_strategy
 
     accounts_to_sync = []
     if account_name:
@@ -107,7 +126,12 @@ def sync(ctx: click.Context, account_name: str | None, oauth_port: int, force: b
 
         try:
             stats = _sync_account(
-                account, oauth_port, verbose=ctx.obj.get("verbose", 0), force=force
+                account,
+                oauth_port,
+                verbose=ctx.obj.get("verbose", 0),
+                force=force,
+                dry_run=dry,
+                conflict_strategy=selected_conflict_strategy,
             )
 
             total_stats["created_tw"] += stats.created_tw
@@ -160,7 +184,12 @@ def sync(ctx: click.Context, account_name: str | None, oauth_port: int, force: b
 
 
 def _sync_account(
-    account: AccountConfig, oauth_port: int, verbose: int = 0, force: bool = False
+    account: AccountConfig,
+    oauth_port: int,
+    verbose: int = 0,
+    force: bool = False,
+    dry_run: bool = False,
+    conflict_strategy: str = "notify",
 ):
     """Sync a single account."""
     gtasks = GTasksSide(
@@ -182,6 +211,9 @@ def _sync_account(
         account=account,
         serdes_dir=serdes_dir,
         force=force,
+        dry_run=dry_run,
+        conflict_strategy=conflict_strategy,
+        verbose=verbose,
     )
 
     stats = synchronizer.sync()

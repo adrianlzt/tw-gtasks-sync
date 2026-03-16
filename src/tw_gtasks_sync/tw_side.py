@@ -39,6 +39,16 @@ class TWItem(dict):
         return str(self.get(TW_UUID_KEY, ""))
 
     @property
+    def id(self) -> int | None:
+        value = self.get("id")
+        if value is None:
+            return None
+        task_id = int(value)
+        if task_id <= 0:
+            return None
+        return task_id
+
+    @property
     def description(self) -> str:
         return self.get(TW_DESCRIPTION_KEY, "")
 
@@ -252,6 +262,8 @@ class TaskWarriorSide:
             if key == TW_UUID_KEY:
                 continue
             if key == "tags":
+                continue
+            if key == TW_ANNOTATIONS_KEY:
                 continue
 
             if key == GTASKS_ID_UDA:

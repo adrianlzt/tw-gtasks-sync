@@ -3,6 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from difflib import ndiff
+
+
+@dataclass
+class FieldDiff:
+    """Difference for a single field."""
+
+    field: str
+    tw_current: str | None
+    tw_cached: str | None
+    gtasks_current: str | None
+    gtasks_cached: str | None
 
 
 @dataclass
@@ -13,8 +25,10 @@ class ConflictInfo:
     tw_modified: str | None
     gtasks_modified: str | None
     account_name: str
+    tw_id: int | None = None
     tw_uuid: str | None = None
     gtasks_id: str | None = None
+    field_diffs: list[FieldDiff] | None = None
 
 
 def notify_conflict(conflict: ConflictInfo) -> None:
@@ -28,11 +42,21 @@ def notify_conflict(conflict: ConflictInfo) -> None:
         f"   Account: {conflict.account_name}\n"
         f"   TW modified: {conflict.tw_modified or 'unknown'}\n"
         f"   GTasks modified: {conflict.gtasks_modified or 'unknown'}\n"
-        f"   Skipping sync for this task.\n"
-        f"   To resolve:\n"
-        f"     1. Edit task in Taskwarrior: task {conflict.tw_uuid or '<uuid>'} edit\n"
-        f"     2. Or edit in Google Tasks, then run sync again\n"
-        f"     3. Or force TW -> GTasks: tw-gtasks-sync sync --force\n"
+    )
+
+    if conflict.field_diffs:
+        print("   Changed fields:")
+        for diff in conflict.field_diffs:
+            print(f"     {diff.field}:")
+            print_field_change("TW", diff.tw_cached, diff.tw_current)
+            print_field_change("GTasks", diff.gtasks_cached, diff.gtasks_current)
+
+    print(
+        "   Skipping sync for this task.\n"
+        "   To resolve:\n"
+        f"     1. Edit task in Taskwarrior: task {conflict.tw_id or conflict.tw_uuid or '<uuid>'} edit\n"
+        "     2. Or edit in Google Tasks, then run sync again\n"
+        "     3. Or force TW -> GTasks: tw-gtasks-sync sync --force\n"
     )
 
     try:
@@ -45,6 +69,40 @@ def notify_conflict(conflict: ConflictInfo) -> None:
         notification.send()
     except Exception:
         pass
+
+
+def print_field_change(label: str, before: str | None, after: str | None) -> None:
+    if _should_show_text_diff(before, after):
+        print(f"       {label} diff:")
+        for line in _render_text_diff(before, after):
+            print(f"         {line}")
+        return
+
+    print(f"       {label} old: {before!r}")
+    print(f"       {label} new: {after!r}")
+
+
+def _should_show_text_diff(before: str | None, after: str | None) -> bool:
+    values = [value for value in (before, after) if value]
+    if not values:
+        return False
+    return any("\n" in value for value in values) or any(len(value) > 80 for value in values)
+
+
+def _render_text_diff(before: str | None, after: str | None) -> list[str]:
+    before_lines = [] if before is None else before.splitlines()
+    after_lines = [] if after is None else after.splitlines()
+    lines = []
+
+    for line in ndiff(before_lines, after_lines):
+        if line.startswith("? "):
+            continue
+        lines.append(line)
+
+    if not lines:
+        return ["(no visible text changes)"]
+
+    return lines
 
 
 def notify_sync_complete(
