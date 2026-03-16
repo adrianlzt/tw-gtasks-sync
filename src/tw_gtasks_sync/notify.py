@@ -144,9 +144,9 @@ def notify_sync_complete(
         parts.append(f"⚠️ {conflicts} conflicts")
 
     if not parts:
-        message = "Everything already in sync!"
-    else:
-        message = " | ".join(parts)
+        return
+
+    message = " | ".join(parts)
 
     try:
         from notifypy import Notify
